@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { defaultErrorHandler } from 'flitz';
-import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SETUP_FLITZ_APP, SetupFlitzAppControllerAction } from "../types";
+import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction } from "../types";
+import { getAllClassProps } from "../utils";
 
 /**
  * Marks a class as controller.
@@ -44,9 +44,7 @@ export function Controller(): ClassDecorator {
 
     actions.push(
       async (context: SetupFlitzAppControllerActionContext) => {
-        let onError = defaultErrorHandler;
-
-        const allPropNames = Object.getOwnPropertyNames(classFunction.prototype);
+        const allPropNames = getAllClassProps(classFunction);
 
         const allMethods = allPropNames.map(propName => {
           return {
@@ -56,8 +54,27 @@ export function Controller(): ClassDecorator {
         }).filter(entry => typeof entry.value === 'function');
 
         const controllerMethods = allMethods.filter(entry => {
-          return Array.isArray(entry.value[SETUP_FLITZ_APP]);
+          return Array.isArray(entry.value[SETUP_FLITZ_APP]) &&
+            !entry.value[SETUP_ERROR_HANDLER]?.length;
         });
+
+        // controller wide error handler?
+        const withSetupErrorHandlers = allMethods.filter(entry => {
+          return Array.isArray(entry.value[SETUP_ERROR_HANDLER]);
+        });
+        for (const entry of withSetupErrorHandlers) {
+          const setupErrorHandlerActions: SetupFlitzAppControllerErrorHandlerAction[] = entry.value[SETUP_ERROR_HANDLER];
+
+          for (const setupAction of setupErrorHandlerActions) {
+            await setupAction({
+              app: context.app,
+              controller: context.controller,
+              controllerClass: context.controllerClass,
+              file: context.file,
+              method: entry.value
+            });
+          }
+        }
 
         for (const entry of controllerMethods) {
           const setupMethodActions: SetupFlitzAppControllerMethodAction[] = entry.value[SETUP_FLITZ_APP];
@@ -69,8 +86,7 @@ export function Controller(): ClassDecorator {
               controller: context.controller,
               file: context.file,
               method: entry.value,
-              name: entry.property,
-              onError
+              name: entry.property
             });
           }
         }

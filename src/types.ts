@@ -18,11 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { Flitz, RequestErrorHandler } from "flitz";
+import { Flitz } from "flitz";
 
 export type HttpMethod = 'connect' | 'delete' | 'get' | 'head' | 'options' | 'patch' | 'post' | 'put' | 'trace';
 
 export type SetupFlitzAppControllerAction = (context: SetupFlitzAppControllerActionContext) => Promise<any>;
+
+export type SetupFlitzAppControllerErrorHandlerAction = (context: SetupFlitzAppControllerErrorHandlerActionContext) => Promise<any>;
 
 export type SetupFlitzAppControllerMethodAction = (context: SetupFlitzAppControllerMethodActionContext) => Promise<any>;
 
@@ -30,7 +32,16 @@ export interface SetupFlitzAppControllerActionContext {
   app: Flitz;
   basePath: string;
   controller: any;
+  controllerClass: any;
   file: string;
+}
+
+export interface SetupFlitzAppControllerErrorHandlerActionContext {
+  app: Flitz;
+  controller: any;
+  controllerClass: any;
+  file: string;
+  method: Function;
 }
 
 export interface SetupFlitzAppControllerMethodActionContext {
@@ -40,7 +51,6 @@ export interface SetupFlitzAppControllerMethodActionContext {
   file: string;
   method: Function;
   name: string;
-  onError: RequestErrorHandler;
 }
 
 export enum ControllerObjectType {
@@ -49,5 +59,7 @@ export enum ControllerObjectType {
 }
 
 export const CONTROLLER_OBJECT_TYPE = Symbol('CONTROLLER_OBJECT_TYPE');
+export const ERROR_HANDLER = Symbol('ERROR_HANDLER');
 export const ROUTE_SEP = '/';
 export const SETUP_FLITZ_APP = Symbol('SETUP_FLITZ_APP');
+export const SETUP_ERROR_HANDLER = Symbol('SETUP_ERROR_HANDLER');

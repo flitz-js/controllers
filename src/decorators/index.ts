@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil } from 'flitz';
+import { CanBeNil, Middleware, Request as FlitzRequest, RequestErrorHandler, RequestPath, Response as FlitzResponse } from 'flitz';
 
 /**
  * Options for a controller route without a body.
@@ -31,6 +31,18 @@ export interface ControllerRouteOptions {
    * Default: (true)
    */
   autoEnd?: CanBeNil<boolean>;
+  /**
+   * The custom error handler.
+   */
+  onError?: CanBeNil<RequestErrorHandler>;
+  /**
+   * The custom path.
+   */
+  path?: CanBeNil<RequestPath>;
+  /**
+   * One or more custom middlewares.
+   */
+  use?: CanBeNil<Middleware | Middleware[]>;
 }
 
 /**
@@ -43,11 +55,24 @@ export interface ControllerRouteWithBodyOptions extends ControllerRouteOptions {
  * Options for a controller route decorator.
  */
 export type ControllerRouteOptionsValue<TOptions extends ControllerRouteOptions = ControllerRouteOptions>
-  = string | TOptions;
+  = RequestPath | TOptions;
 
-export * from './Controller';
+/**
+ * An extended request context.
+ */
+export interface Request extends FlitzRequest {
+}
+
+/**
+ * An extended response context.
+ */
+export interface Response extends FlitzResponse {
+}
+
 export * from './CONNECT';
+export * from './Controller';
 export * from './DELETE';
+export * from './ErrorHandler';
 export * from './GET';
 export * from './HEAD';
 export * from './OPTIONS';

@@ -163,7 +163,7 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
     for (const modulePropName in controllerModule) {
       const maybeClass: any = controllerModule[modulePropName];
       if (typeof maybeClass === 'function' && typeof maybeClass.constructor === 'function') {
-        if (maybeClass[CONTROLLER_OBJECT_TYPE] === ControllerObjectType.Controller) {
+        if (maybeClass.prototype?.[CONTROLLER_OBJECT_TYPE] === ControllerObjectType.Controller) {
           const controller: any = new maybeClass();
           const setupControllerActions: SetupFlitzAppControllerAction[] = controller[SETUP_FLITZ_APP];
 
@@ -176,6 +176,7 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
               app: options.app,
               basePath,
               controller,
+              controllerClass: maybeClass,
               file
             });
           }

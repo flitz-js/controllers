@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 import util from 'util';
+import { RequestPath } from 'flitz';
 
 export function asAsync<T extends Function = ((...args: any[]) => Promise<any>)>(action: Function): T {
   if (util.types.isAsyncFunction(action)) {
@@ -47,4 +48,38 @@ export function compareValuesBy<T1, T2>(x: T1, y: T1, selector: (item: T1) => T2
   }
 
   return 0;
+}
+
+export function getAllClassProps(startClass: any): string[] {
+  const props: string[] = [];
+
+  if (startClass instanceof Function) {
+    let currentClass = startClass;
+
+    while (currentClass) {
+      if (currentClass.prototype) {
+        for (const propName of Object.getOwnPropertyNames(currentClass.prototype)) {
+          if (!props.includes(propName)) {
+            props.unshift(propName);
+          }
+        }
+      }
+
+      const parentClass = Object.getPrototypeOf(currentClass);
+
+      if (parentClass && parentClass !== Object && parentClass.name) {
+        currentClass = parentClass;
+      } else {
+        break;
+      }
+    }
+  }
+
+  return props;
+}
+
+export function isRequestPath(val: any): val is RequestPath {
+  return typeof val === 'string' ||
+    val instanceof RegExp ||
+    typeof val === 'function';
 }

@@ -19,32 +19,31 @@
 // SOFTWARE.
 
 import path from 'path';
-import { CanBeNil, Flitz, Middleware, RequestErrorHandler, RequestHandler, RequestPath } from 'flitz';
-import { ControllerRouteWithBodyOptions } from '.';
-import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, HttpMethod, ROUTE_SEP, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
-import { asAsync } from '../utils';
+import { CanBeNil, defaultErrorHandler, Flitz, Middleware, RequestErrorHandler, RequestHandler, RequestPath } from 'flitz';
+import { ControllerRouteOptionsValue, ControllerRouteWithBodyOptions } from '.';
+import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, ROUTE_SEP, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
+import { asAsync, isRequestPath } from '../utils';
 
 interface CreateHttpMethodDecoratorOptions {
-  decoratorOptions: CanBeNil<ControllerRouteWithBodyOptions>;
+  decoratorOptions: CanBeNil<ControllerRouteOptionsValue<ControllerRouteWithBodyOptions>>;
   name: HttpMethod;
 }
 
 interface RegisterHttpMethodOptions {
-  action: Function;
   app: Flitz;
   autoEnd: boolean;
-  name: HttpMethod;
+  controller: any;
+  getErrorHandler: () => RequestErrorHandler;
+  getRequestHandler: () => RequestHandler;
   middlewares: Middleware[];
-  onError: RequestErrorHandler;
+  name: HttpMethod;
   route: RequestPath;
-  thisArg?: any;
 }
 
 interface WrapActionOptions {
-  action: Function;
   autoEnd: boolean;
-  onError: RequestErrorHandler;
-  thisArg: any;
+  getErrorHandler: () => RequestErrorHandler;
+  getRequestHandler: () => RequestHandler;
 }
 
 export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOptions): MethodDecorator {
@@ -61,27 +60,89 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
       method[SETUP_FLITZ_APP] = actions = [];
     }
 
-    const autoEnd = isNil(options.decoratorOptions?.autoEnd)
-      ? true : !!options.decoratorOptions!.autoEnd;
+    // options.decoratorOptions
+    let routeOptions: CanBeNil<ControllerRouteWithBodyOptions>;
+    {
+      if (isRequestPath(options.decoratorOptions)) {
+        routeOptions = {
+          path: options.decoratorOptions
+        };
+      } else {
+        routeOptions = options.decoratorOptions;
+      }
+
+      if (isNil(routeOptions)) {
+        routeOptions = {};
+      }
+
+      if (typeof routeOptions !== 'object') {
+        throw new TypeError('options.decoratorOptions must be string, RegExp, function or object');
+      }
+    }
+
+    const autoEnd = isNil(routeOptions?.autoEnd) ? true : !!routeOptions!.autoEnd;
+    const customOnError = routeOptions?.onError;
+    const reqPath = routeOptions.path;
+
+    if (!isNil(customOnError)) {
+      if (typeof customOnError !== 'function') {
+        throw new TypeError('options.decoratorOptions.onError must be function');
+      }
+    }
+
+    if (!isNil(reqPath)) {
+      if (!isRequestPath(reqPath)) {
+        throw new TypeError('options.decoratorOptions.path must be string, RegExp or function');
+      }
+    }
 
     actions.push(
       async (context: SetupFlitzAppControllerMethodActionContext) => {
-        let route: RequestPath = context.basePath;
-
+        const handler = asAsync<RequestHandler>(method.bind(context.controller));
         const routeName = String(methodName).trim();
+
+        // relative path
+        let relativePath = '';
         if (routeName && routeName !== 'index') {
-          route = route + ROUTE_SEP + routeName;
+          relativePath += routeName;
+        }
+        relativePath = normalizePath(relativePath);
+
+        // define route
+        let route: RequestPath;
+        if (isNil(reqPath)) {
+          route = normalizePath(context.basePath + normalizePath(relativePath));  // default, relative path
+        } else {
+          if (typeof reqPath === 'function') {
+            route = reqPath;  // custom validator
+          } else if (reqPath instanceof RegExp) {
+            route = () => reqPath.test(relativePath);  // custom regular expression
+          } else {
+            route = normalizePath(context.basePath + normalizePath(reqPath));  // custom, relative path
+          }
+        }
+
+        // middlewares
+        const middlewares: Middleware[] = [];
+        if (!isNil(routeOptions?.use)) {
+          if (Array.isArray(routeOptions?.use)) {
+            middlewares.push(...routeOptions?.use!);
+          } else {
+            middlewares.push(routeOptions?.use!);
+          }
         }
 
         registerHttpMethod({
-          name: options.name,
-          action: context.method,
           app: context.app,
           autoEnd,
-          onError: context.onError,
-          middlewares: [],
-          route,
-          thisArg: context.controller
+          controller: context.controller,
+          getErrorHandler: () => {
+            return (customOnError || context.controller[ERROR_HANDLER] || defaultErrorHandler).bind(context.controller);
+          },
+          getRequestHandler: () => handler,
+          middlewares,
+          name: options.name,
+          route
         });
       }
     );
@@ -123,34 +184,31 @@ export function registerHttpMethod(
       use: options.middlewares
     },
     wrapAction({
-      action: options.action,
       autoEnd: options.autoEnd,
-      onError: options.onError,
-      thisArg: options.thisArg
-    }).bind(options.thisArg)
+      getErrorHandler: options.getErrorHandler,
+      getRequestHandler: options.getRequestHandler
+    }).bind(options.controller)
   );
 }
 
-function wrapAction({ action, autoEnd, onError, thisArg }: WrapActionOptions): RequestHandler {
-  action = asAsync(action.bind(thisArg));
-
+function wrapAction({ autoEnd, getErrorHandler, getRequestHandler }: WrapActionOptions): RequestHandler {
   if (autoEnd) {
     return async (request, response) => {
       try {
-        await action(request, response);
+        await getRequestHandler()(request, response);
 
         response.end();
       } catch (error) {
-        await onError(error, request, response);
+        await getErrorHandler()(error, request, response);
       }
     };
   }
 
   return async (request, response) => {
     try {
-      await action(request, response);
+      await getRequestHandler()(request, response);
     } catch (error) {
-      await onError(error, request, response);
+      await getErrorHandler()(error, request, response);
     }
   };
 }
