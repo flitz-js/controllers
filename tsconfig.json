@@ -2,7 +2,8 @@
   "extends": "@flitz/tsconfig",
   "compilerOptions": {
     "outDir": "lib",
-    "rootDir": "src"
+    "rootDir": "src",
+    "experimentalDecorators": true
   },
   "exclude": [
     "node_modules",
