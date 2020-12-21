@@ -67,8 +67,10 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
     actions.push(
       async (context: SetupFlitzAppControllerMethodActionContext) => {
         let route: RequestPath = context.basePath;
-        if (methodName && methodName !== 'index') {
-          route = '/' + route;
+
+        const routeName = String(methodName).trim();
+        if (routeName && routeName !== 'index') {
+          route = route + ROUTE_SEP + routeName;
         }
 
         registerHttpMethod({
