@@ -23,9 +23,11 @@ import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerAc
 
 /**
  * Marks a class as controller.
+ * 
+ * @returns {ClassDecorator} The class decorator.
  */
-export function Controller() {
-  return function (classFunction: any) {
+export function Controller(): ClassDecorator {
+  return function (classFunction: Function) {
     if (typeof classFunction !== 'function') {
       throw new TypeError('classFunction must be function');
     }
@@ -33,7 +35,7 @@ export function Controller() {
       throw new TypeError('classFunction must be class');
     }
 
-    classFunction[CONTROLLER_OBJECT_TYPE] = ControllerObjectType.Controller;
+    classFunction.prototype[CONTROLLER_OBJECT_TYPE] = ControllerObjectType.Controller;
 
     let actions: SetupFlitzAppControllerAction[] = classFunction.prototype[SETUP_FLITZ_APP];
     if (!Array.isArray(actions)) {
@@ -65,6 +67,7 @@ export function Controller() {
               app: context.app,
               basePath: context.basePath,
               controller: context.controller,
+              file: context.file,
               method: entry.value,
               name: entry.property,
               onError

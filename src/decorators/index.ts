@@ -18,6 +18,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+import { CanBeNil } from 'flitz';
+
+/**
+ * Options for a controller route without a body.
+ */
+export interface ControllerRouteOptions {
+  /**
+   * Indicates if route method should call 'end()' method
+   * of a request context automatically or not.
+   * 
+   * Default: (true)
+   */
+  autoEnd?: CanBeNil<boolean>;
+}
+
+/**
+ * Options for a controller route with a body.
+ */
+export interface ControllerRouteWithBodyOptions extends ControllerRouteOptions {
+}
+
+/**
+ * Options for a controller route decorator.
+ */
+export type ControllerRouteOptionsValue<TOptions extends ControllerRouteOptions = ControllerRouteOptions>
+  = string | TOptions;
+
 export * from './Controller';
 export * from './CONNECT';
 export * from './DELETE';

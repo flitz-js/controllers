@@ -30,12 +30,14 @@ export interface SetupFlitzAppControllerActionContext {
   app: Flitz;
   basePath: string;
   controller: any;
+  file: string;
 }
 
 export interface SetupFlitzAppControllerMethodActionContext {
   app: Flitz;
   basePath: string;
   controller: any;
+  file: string;
   method: Function;
   name: string;
   onError: RequestErrorHandler;

@@ -24,6 +24,7 @@ import path from 'path';
 import { CanBeNil, Flitz } from 'flitz';
 import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerAction, SETUP_FLITZ_APP } from './types';
 import { normalizePath } from './decorators/utils';
+import { compareValues, compareValuesBy } from './utils';
 
 /**
  * A possible value for 'initControllers()' function.
@@ -108,31 +109,73 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
     throw new TypeError('Any item of options.files must be string');
   }
 
-  const matchingFiles = await fastGlob(files, {
+  const matchingFiles = (await fastGlob(files, {
     absolute: true,
     cwd: rootDir,
     onlyFiles: true,
     unique: true
+  })).filter(fullFilePath => {
+    // skip files with leading _
+    return !path.basename(fullFilePath).trim().startsWith('_');
+  }).sort((x, y) => {
+    // first by directory
+    const COMP_0 = compareValuesBy(x, y, fullFilePath => {
+      return path.dirname(fullFilePath).toLowerCase().trim();
+    });
+    if (COMP_0 !== 0) {
+      return COMP_0;
+    }
+
+    // files called 'index' will be loaded
+    // before all other ones
+    const COMP_1 = compareValuesBy(x, y, fullFilePath => {
+      const nameOfFileOnly = path.basename(
+        fullFilePath,
+        path.extname(fullFilePath)
+      ).trim();
+
+      return 'index' !== nameOfFileOnly ? 1 : 0;
+    });
+    if (COMP_1 !== 0) {
+      return COMP_1;
+    }
+
+    // then by name
+    const COMP_2 = compareValuesBy(x, y, fullFilePath => {
+      return path.basename(fullFilePath).toLowerCase().trim();
+    });
+    if (COMP_2 !== 0) {
+      return COMP_2;
+    }
+
+    return compareValues(
+      x.toLowerCase().trim(),
+      y.toLowerCase().trim()
+    );  // now by full name
   });
 
-  for (const moduleFile of matchingFiles) {
-    const moduleDir = path.dirname(moduleFile);
+  for (const file of matchingFiles) {
+    const moduleFile = require.resolve(file);
+    const moduleDir = path.dirname(file);
 
-    const controllerModule: any = require(require.resolve(moduleFile));
+    const controllerModule: any = require(moduleFile);
     for (const modulePropName in controllerModule) {
-      const modulePropValue: any = controllerModule[modulePropName];
-      if (typeof modulePropValue === 'function' && typeof modulePropValue.constructor === 'function') {
-        if (modulePropValue[CONTROLLER_OBJECT_TYPE] === ControllerObjectType.Controller) {
-          const controller = new modulePropValue();
+      const maybeClass: any = controllerModule[modulePropName];
+      if (typeof maybeClass === 'function' && typeof maybeClass.constructor === 'function') {
+        if (maybeClass[CONTROLLER_OBJECT_TYPE] === ControllerObjectType.Controller) {
+          const controller: any = new maybeClass();
           const setupControllerActions: SetupFlitzAppControllerAction[] = controller[SETUP_FLITZ_APP];
 
-          let basePath = normalizePath(path.relative(rootDir, moduleDir));
+          const basePath = normalizePath(
+            path.relative(rootDir, moduleDir)
+          );
 
           for (const setupAction of setupControllerActions) {
             await setupAction({
               app: options.app,
               basePath,
-              controller
+              controller,
+              file
             });
           }
         }

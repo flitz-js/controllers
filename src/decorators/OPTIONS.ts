@@ -18,13 +18,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+import { CanBeNil } from 'flitz';
+import { ControllerRouteOptionsValue } from '.';
 import { createHttpMethodDecorator } from "./utils";
 
 /**
  * Add a controller method to handle a OPTIONS request.
+ * 
+ * @param {CanBeNil<ControllerRouteOptionsValue>} [options] Custom options.
+ * 
+ * @returns {MethodDecorator} The new decorator function.
  */
-export function OPTIONS() {
+export function OPTIONS(options?: CanBeNil<ControllerRouteOptionsValue>): MethodDecorator {
   return createHttpMethodDecorator({
+    decoratorOptions: options,
     name: 'options'
   });
 }

@@ -18,13 +18,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+import { CanBeNil } from 'flitz';
+import { ControllerRouteOptionsValue, ControllerRouteWithBodyOptions } from '.';
 import { createHttpMethodDecorator } from "./utils";
 
 /**
  * Add a controller method to handle a PUT request.
+ * 
+ * @param {CanBeNil<ControllerRouteOptionsValue<ControllerRouteWithBodyOptions>>} [options] Custom options.
+ * 
+ * @returns {MethodDecorator} The new decorator function.
  */
-export function PUT() {
+export function PUT(options?: CanBeNil<ControllerRouteOptionsValue<ControllerRouteWithBodyOptions>>): MethodDecorator {
   return createHttpMethodDecorator({
+    decoratorOptions: options,
     name: 'put'
   });
 }

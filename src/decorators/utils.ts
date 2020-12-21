@@ -19,11 +19,13 @@
 // SOFTWARE.
 
 import path from 'path';
-import util from 'util';
 import { CanBeNil, Flitz, Middleware, RequestErrorHandler, RequestHandler, RequestPath } from 'flitz';
+import { ControllerRouteWithBodyOptions } from '.';
 import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, HttpMethod, ROUTE_SEP, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
+import { asAsync } from '../utils';
 
 interface CreateHttpMethodDecoratorOptions {
+  decoratorOptions: CanBeNil<ControllerRouteWithBodyOptions>;
   name: HttpMethod;
 }
 
@@ -42,21 +44,12 @@ interface WrapActionOptions {
   action: Function;
   autoEnd: boolean;
   onError: RequestErrorHandler;
+  thisArg: any;
 }
 
-export function asAsync<T extends Function = ((...args: any[]) => Promise<any>)>(action: Function): T {
-  if (util.types.isAsyncFunction(action)) {
-    return action as T;
-  }
-
-  return (async (...args: any[]) => {
-    return action(...args);
-  }) as any;
-}
-
-export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOptions) {
-  return function (target: any, methodName: string, descriptor: PropertyDescriptor) {
-    const method = descriptor?.value;
+export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOptions): MethodDecorator {
+  return function (target, methodName, descriptor) {
+    const method: any = descriptor?.value;
     if (typeof method !== 'function') {
       throw new TypeError('descriptor.value must be function');
     }
@@ -67,6 +60,9 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
     if (!Array.isArray(actions)) {
       method[SETUP_FLITZ_APP] = actions = [];
     }
+
+    const autoEnd = isNil(options.decoratorOptions?.autoEnd)
+      ? true : !!options.decoratorOptions!.autoEnd;
 
     actions.push(
       async (context: SetupFlitzAppControllerMethodActionContext) => {
@@ -79,7 +75,7 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
           name: options.name,
           action: context.method,
           app: context.app,
-          autoEnd: true,
+          autoEnd,
           onError: context.onError,
           middlewares: [],
           route,
@@ -127,13 +123,14 @@ export function registerHttpMethod(
     wrapAction({
       action: options.action,
       autoEnd: options.autoEnd,
-      onError: options.onError
+      onError: options.onError,
+      thisArg: options.thisArg
     }).bind(options.thisArg)
   );
 }
 
-function wrapAction({ action, autoEnd, onError }: WrapActionOptions): RequestHandler {
-  action = asAsync(action);
+function wrapAction({ action, autoEnd, onError, thisArg }: WrapActionOptions): RequestHandler {
+  action = asAsync(action.bind(thisArg));
 
   if (autoEnd) {
     return async (request, response) => {

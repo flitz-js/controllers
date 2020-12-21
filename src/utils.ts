@@ -18,20 +18,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil } from 'flitz';
-import { ControllerRouteOptionsValue } from '.';
-import { createHttpMethodDecorator } from "./utils";
+import util from 'util';
 
-/**
- * Add a controller method to handle a HEAD request.
- * 
- * @param {CanBeNil<ControllerRouteOptionsValue>} [options] Custom options.
- * 
- * @returns {MethodDecorator} The new decorator function.
- */
-export function HEAD(options?: CanBeNil<ControllerRouteOptionsValue>): MethodDecorator {
-  return createHttpMethodDecorator({
-    decoratorOptions: options,
-    name: 'head'
-  });
+export function asAsync<T extends Function = ((...args: any[]) => Promise<any>)>(action: Function): T {
+  if (util.types.isAsyncFunction(action)) {
+    return action as T;
+  }
+
+  return (async (...args: any[]) => {
+    return action(...args);
+  }) as any;
+}
+
+export function compareValues<T>(x: T, y: T): number {
+  return compareValuesBy(x, y, item => item);
+}
+
+export function compareValuesBy<T1, T2>(x: T1, y: T1, selector: (item: T1) => T2): number {
+  const valX = selector(x);
+  const valY = selector(y);
+
+  if (valX !== valY) {
+    if (valX < valY) {
+      return -1;
+    }
+
+    return 1;  // valX > valY
+  }
+
+  return 0;
 }
