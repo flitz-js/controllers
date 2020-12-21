@@ -148,10 +148,11 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
       return COMP_2;
     }
 
+    // now by full name
     return compareValues(
       x.toLowerCase().trim(),
       y.toLowerCase().trim()
-    );  // now by full name
+    );
   });
 
   for (const file of matchingFiles) {
