@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction } from "../types";
+import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerSerializerAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction, SETUP_SERIALIZER } from "../types";
 import { getAllClassProps } from "../utils";
 
 /**
@@ -72,6 +72,25 @@ export function Controller(): ClassDecorator {
               controllerClass: context.controllerClass,
               file: context.file,
               method: entry.value
+            });
+          }
+        }
+
+        // controller wide serializer
+        const withSetupSerilizers = allMethods.filter(entry => {
+          return Array.isArray(entry.value[SETUP_SERIALIZER]);
+        });
+        for (const entry of withSetupSerilizers) {
+          const setupSerilizerActions: SetupFlitzAppControllerSerializerAction[] = entry.value[SETUP_SERIALIZER];
+
+          for (const setupAction of setupSerilizerActions) {
+            await setupAction({
+              app: context.app,
+              basePath: context.basePath,
+              controller: context.controller,
+              file: context.file,
+              method: entry.value,
+              name: entry.property
             });
           }
         }

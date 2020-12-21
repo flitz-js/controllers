@@ -21,7 +21,7 @@
 import fastGlob from 'fast-glob';
 import fs from 'fs';
 import path from 'path';
-import { CanBeNil, Flitz } from 'flitz';
+import { CanBeNil, Flitz, Request as FlitzRequest, Response as FlitzResponse } from 'flitz';
 import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerAction, SETUP_FLITZ_APP } from './types';
 import { normalizePath } from './decorators/utils';
 import { compareValues, compareValuesBy } from './utils';
@@ -49,6 +49,27 @@ export interface InitControllersOptions {
    */
   rootDir?: CanBeNil<string>;
 }
+
+/**
+ * An extended request context.
+ */
+export interface Request extends FlitzRequest {
+}
+
+/**
+ * An extended response context.
+ */
+export interface Response extends FlitzResponse {
+}
+
+/**
+ * Describes an action, that returns the result of a request handler, in serialized form.
+ * 
+ * @param {any} result The result data of the action.
+ * @param {Request} request The request context.
+ * @param {Response} response The request context.
+ */
+export type ResponseSerializer = (result: any, request: Request, response: Response) => Promise<any>;
 
 const DEFAULT_FILE_FILTERS = ['**/*.js', '**/*.ts'];
 

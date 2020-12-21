@@ -1,6 +1,6 @@
 {
   "name": "@flitz/controllers",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Framework, that sets up controllers and routes for flitz, using decorators.",
   "private": false,
   "main": "lib/index.js",

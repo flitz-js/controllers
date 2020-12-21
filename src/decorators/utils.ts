@@ -19,10 +19,11 @@
 // SOFTWARE.
 
 import path from 'path';
-import { CanBeNil, defaultErrorHandler, Flitz, Middleware, RequestErrorHandler, RequestHandler, RequestPath } from 'flitz';
+import { CanBeNil, defaultErrorHandler, Flitz, Middleware, Request, RequestErrorHandler, RequestHandler, RequestPath, Response } from 'flitz';
 import { ControllerRouteOptionsValue, ControllerRouteWithBodyOptions } from '.';
-import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, ROUTE_SEP, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
+import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, ROUTE_SEP, SERIALIZER, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
 import { asAsync, isRequestPath } from '../utils';
+import { ResponseSerializer } from '..';
 
 interface CreateHttpMethodDecoratorOptions {
   decoratorOptions: CanBeNil<ControllerRouteOptionsValue<ControllerRouteWithBodyOptions>>;
@@ -35,6 +36,7 @@ interface RegisterHttpMethodOptions {
   controller: any;
   getErrorHandler: () => RequestErrorHandler;
   getRequestHandler: () => RequestHandler;
+  getResponseSerializer: () => CanBeNil<ResponseSerializer>;
   middlewares: Middleware[];
   name: HttpMethod;
   route: RequestPath;
@@ -44,6 +46,7 @@ interface WrapActionOptions {
   autoEnd: boolean;
   getErrorHandler: () => RequestErrorHandler;
   getRequestHandler: () => RequestHandler;
+  getResponseSerializer: () => CanBeNil<ResponseSerializer>;
 }
 
 export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOptions): MethodDecorator {
@@ -82,11 +85,18 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
 
     const autoEnd = isNil(routeOptions?.autoEnd) ? true : !!routeOptions!.autoEnd;
     const customOnError = routeOptions?.onError;
+    const customSerializer = routeOptions?.serializer;
     const reqPath = routeOptions.path;
 
     if (!isNil(customOnError)) {
       if (typeof customOnError !== 'function') {
         throw new TypeError('options.decoratorOptions.onError must be function');
+      }
+    }
+
+    if (!isNil(customSerializer)) {
+      if (typeof customSerializer !== 'function') {
+        throw new TypeError('options.decoratorOptions.serializer must be function');
       }
     }
 
@@ -140,6 +150,12 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
             return (customOnError || context.controller[ERROR_HANDLER] || defaultErrorHandler).bind(context.controller);
           },
           getRequestHandler: () => handler,
+          getResponseSerializer: () => {
+            const serializer = customSerializer || context.controller[SERIALIZER];
+            if (serializer) {
+              return serializer.bind(context.controller);
+            }
+          },
           middlewares,
           name: options.name,
           route
@@ -186,18 +202,32 @@ export function registerHttpMethod(
     wrapAction({
       autoEnd: options.autoEnd,
       getErrorHandler: options.getErrorHandler,
-      getRequestHandler: options.getRequestHandler
+      getRequestHandler: options.getRequestHandler,
+      getResponseSerializer: options.getResponseSerializer
     }).bind(options.controller)
   );
 }
 
-function wrapAction({ autoEnd, getErrorHandler, getRequestHandler }: WrapActionOptions): RequestHandler {
+function wrapAction({ autoEnd, getErrorHandler, getRequestHandler, getResponseSerializer }: WrapActionOptions): RequestHandler {
+  const withSerializer = async (req: Request, resp: Response) => {
+    let result = await getRequestHandler()(req, resp);
+
+    const serializer = getResponseSerializer();
+    if (serializer) {
+      result = await serializer(result, req, resp);
+    }
+
+    return result;
+  };
+
   if (autoEnd) {
     return async (request, response) => {
       try {
-        await getRequestHandler()(request, response);
+        const result = await withSerializer(request, response);
 
         response.end();
+
+        return result;
       } catch (error) {
         await getErrorHandler()(error, request, response);
       }
@@ -206,7 +236,7 @@ function wrapAction({ autoEnd, getErrorHandler, getRequestHandler }: WrapActionO
 
   return async (request, response) => {
     try {
-      await getRequestHandler()(request, response);
+      return await withSerializer(request, response);;
     } catch (error) {
       await getErrorHandler()(error, request, response);
     }

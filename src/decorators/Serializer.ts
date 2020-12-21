@@ -20,29 +20,22 @@
 
 import { CanBeNil } from "flitz";
 import { isNil } from "./utils";
-import { ERROR_HANDLER, SETUP_ERROR_HANDLER, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerErrorHandlerActionContext } from "../types";
+import { SETUP_ERROR_HANDLER, SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerAction, SetupFlitzAppControllerSerializerActionContext } from "../types";
 
 /**
- * Options for @ErrorHandler() decorator.
+ * Options for @Serializer() decorator.
  */
-export interface ErrorHandlerOptions {
-  /**
-   * Indicates if error handler should call 'end()' method
-   * of a request context automatically or not.
-   * 
-   * Default: (true)
-   */
-  autoEnd?: CanBeNil<boolean>;
+export interface SerializerOptions {
 }
 
 /**
- * Add a method of a controller as an error handler.
+ * Add a method of a controller as a response serializer.
  * 
- * @param {CanBeNil<ErrorHandlerOptions>} [options] Custom options.
+ * @param {CanBeNil<SerializerOptions>} [options] Custom options.
  * 
  * @returns {MethodDecorator} The new decorator function.
  */
-export function ErrorHandler(options?: CanBeNil<ErrorHandlerOptions>): MethodDecorator {
+export function Serializer(options?: CanBeNil<SerializerOptions>): MethodDecorator {
   if (isNil(options)) {
     options = {};
   }
@@ -57,14 +50,14 @@ export function ErrorHandler(options?: CanBeNil<ErrorHandlerOptions>): MethodDec
       throw new TypeError('descriptor.value must be function');
     }
 
-    let actions: SetupFlitzAppControllerErrorHandlerAction[] = method[SETUP_ERROR_HANDLER];
+    let actions: SetupFlitzAppControllerSerializerAction[] = method[SETUP_ERROR_HANDLER];
     if (!Array.isArray(actions)) {
-      method[SETUP_ERROR_HANDLER] = actions = [];
+      method[SETUP_SERIALIZER] = actions = [];
     }
 
     actions.push(
-      async (context: SetupFlitzAppControllerErrorHandlerActionContext) => {
-        context.controller[ERROR_HANDLER] = method;
+      async (context: SetupFlitzAppControllerSerializerActionContext) => {
+        context.controller[SERIALIZER] = method;
       }
     );
   };

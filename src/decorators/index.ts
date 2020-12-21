@@ -18,7 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil, Middleware, Request as FlitzRequest, RequestErrorHandler, RequestPath, Response as FlitzResponse } from 'flitz';
+import { CanBeNil, Middleware, RequestErrorHandler, RequestPath } from 'flitz';
+import { ResponseSerializer } from '..';
 
 /**
  * Options for a controller route without a body.
@@ -40,6 +41,10 @@ export interface ControllerRouteOptions {
    */
   path?: CanBeNil<RequestPath>;
   /**
+   * The custom response serializer.
+   */
+  serializer?: CanBeNil<ResponseSerializer>;
+  /**
    * One or more custom middlewares.
    */
   use?: CanBeNil<Middleware | Middleware[]>;
@@ -57,18 +62,6 @@ export interface ControllerRouteWithBodyOptions extends ControllerRouteOptions {
 export type ControllerRouteOptionsValue<TOptions extends ControllerRouteOptions = ControllerRouteOptions>
   = RequestPath | TOptions;
 
-/**
- * An extended request context.
- */
-export interface Request extends FlitzRequest {
-}
-
-/**
- * An extended response context.
- */
-export interface Response extends FlitzResponse {
-}
-
 export * from './CONNECT';
 export * from './Controller';
 export * from './DELETE';
@@ -79,4 +72,5 @@ export * from './OPTIONS';
 export * from './PATCH';
 export * from './POST';
 export * from './PUT';
+export * from './Serializer';
 export * from './TRACE';

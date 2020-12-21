@@ -28,6 +28,8 @@ export type SetupFlitzAppControllerErrorHandlerAction = (context: SetupFlitzAppC
 
 export type SetupFlitzAppControllerMethodAction = (context: SetupFlitzAppControllerMethodActionContext) => Promise<any>;
 
+export type SetupFlitzAppControllerSerializerAction = (context: SetupFlitzAppControllerSerializerActionContext) => Promise<any>;
+
 export interface SetupFlitzAppControllerActionContext {
   app: Flitz;
   basePath: string;
@@ -53,6 +55,15 @@ export interface SetupFlitzAppControllerMethodActionContext {
   name: string;
 }
 
+export interface SetupFlitzAppControllerSerializerActionContext {
+  app: Flitz;
+  basePath: string;
+  controller: any;
+  file: string;
+  method: Function;
+  name: string;
+}
+
 export enum ControllerObjectType {
   Controller = 'controller',
   Method = 'method',
@@ -61,5 +72,7 @@ export enum ControllerObjectType {
 export const CONTROLLER_OBJECT_TYPE = Symbol('CONTROLLER_OBJECT_TYPE');
 export const ERROR_HANDLER = Symbol('ERROR_HANDLER');
 export const ROUTE_SEP = '/';
+export const SERIALIZER = Symbol('SERIALIZER');
 export const SETUP_FLITZ_APP = Symbol('SETUP_FLITZ_APP');
 export const SETUP_ERROR_HANDLER = Symbol('SETUP_ERROR_HANDLER');
+export const SETUP_SERIALIZER = Symbol('SETUP_SERIALIZER');
