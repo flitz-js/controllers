@@ -19,39 +19,21 @@
 // SOFTWARE.
 
 import { CanBeNil } from "flitz";
-import { isNil } from "../utils";
-import { SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerActionContext, SetupFlitzAppControllerSerializerAction } from "../types";
-import { getActionList, getMethodOrThrow } from "./utils";
+import { isNil, normalizePath } from "../utils";
 
-/**
- * Options for @Serializer() decorator.
- */
-export interface SerializerOptions {
-}
-
-/**
- * Add a method of a controller as a response serializer.
- * 
- * @param {CanBeNil<SerializerOptions>} [options] Custom options.
- * 
- * @returns {MethodDecorator} The new decorator function.
- */
-export function Serializer(options?: CanBeNil<SerializerOptions>): MethodDecorator {
-  if (isNil(options)) {
-    options = {};
+export function getDocsBasePath(basePath: CanBeNil<string>): string {
+  if (isNil(basePath)) {
+    basePath = '';
   }
 
-  if (typeof options !== 'object') {
-    throw new TypeError('options must be object');
+  if (typeof basePath !== 'string') {
+    throw new TypeError('basePath must be string');
   }
 
-  return function (target, methodName, descriptor) {
-    const method = getMethodOrThrow(descriptor);
+  basePath = basePath.trim();
+  if (basePath === '') {
+    return '/docs';
+  }
 
-    getActionList<SetupFlitzAppControllerSerializerAction>(method, SETUP_SERIALIZER).push(
-      async (context: SetupFlitzAppControllerSerializerActionContext) => {
-        context.controller[SERIALIZER] = method;
-      }
-    );
-  };
+  return normalizePath(basePath);
 }

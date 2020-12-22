@@ -73,4 +73,5 @@ export * from './PATCH';
 export * from './POST';
 export * from './PUT';
 export * from './Serializer';
+export * from './Swagger';
 export * from './TRACE';

@@ -19,39 +19,29 @@
 // SOFTWARE.
 
 import { CanBeNil } from "flitz";
-import { isNil } from "../utils";
-import { SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerActionContext, SetupFlitzAppControllerSerializerAction } from "../types";
-import { getActionList, getMethodOrThrow } from "./utils";
 
 /**
- * Options for @Serializer() decorator.
+ * List of known documentation formats.
  */
-export interface SerializerOptions {
+export enum DocumentationFormat {
+  /**
+   * OpenAPI 3
+   */
+  OpenApi3 = 'openapi3'
 }
 
 /**
- * Add a method of a controller as a response serializer.
- * 
- * @param {CanBeNil<SerializerOptions>} [options] Custom options.
- * 
- * @returns {MethodDecorator} The new decorator function.
+ * Options for generated API documentation.
  */
-export function Serializer(options?: CanBeNil<SerializerOptions>): MethodDecorator {
-  if (isNil(options)) {
-    options = {};
-  }
-
-  if (typeof options !== 'object') {
-    throw new TypeError('options must be object');
-  }
-
-  return function (target, methodName, descriptor) {
-    const method = getMethodOrThrow(descriptor);
-
-    getActionList<SetupFlitzAppControllerSerializerAction>(method, SETUP_SERIALIZER).push(
-      async (context: SetupFlitzAppControllerSerializerActionContext) => {
-        context.controller[SERIALIZER] = method;
-      }
-    );
-  };
+export interface DocumentationOptions {
+  /**
+   * The base path. Default: '/docs'
+   */
+  basePath?: CanBeNil<string>;
+  /**
+   * The format. Default: 'openapi3'
+   */
+  format?: CanBeNil<DocumentationFormat>;
 }
+
+export { OpenApi3Options } from './swagger';

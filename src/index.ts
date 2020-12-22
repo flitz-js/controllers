@@ -22,9 +22,11 @@ import fastGlob from 'fast-glob';
 import fs from 'fs';
 import path from 'path';
 import { CanBeNil, Flitz, Request as FlitzRequest, Response as FlitzResponse } from 'flitz';
-import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerAction, SETUP_FLITZ_APP } from './types';
-import { normalizePath } from './decorators/utils';
+import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerAction, SETUP_FLITZ_APP, LoadedController } from './types';
+import { normalizePath } from './utils';
 import { compareValues, compareValuesBy } from './utils';
+import { DocumentationOptions } from './docs';
+import { initDocumentation } from './docs/init';
 
 /**
  * A possible value for 'initControllers()' function.
@@ -39,6 +41,10 @@ export interface InitControllersOptions {
    * The underlying application.
    */
   app: Flitz;
+  /**
+   * Options for a generated API documentation.
+   */
+  documentation?: CanBeNil<DocumentationOptions>;
   /**
    * Glob patterns for module files, that include things like controller classes.
    * Default: *.js or *.ts
@@ -176,6 +182,8 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
     );
   });
 
+  const loadedControllers: LoadedController[] = [];
+
   for (const file of matchingFiles) {
     const moduleFile = require.resolve(file);
     const moduleDir = path.dirname(file);
@@ -201,10 +209,25 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
               file
             });
           }
+
+          loadedControllers.push({
+            class: maybeClass,
+            file: file,
+            instance: controller
+          });
         }
       }
     }
   }
+
+  if (options.documentation) {
+    await initDocumentation({
+      app: options.app,
+      controllers: loadedControllers,
+      documentation: options.documentation
+    });
+  }
 }
 
 export * from './decorators';
+export * from './docs';

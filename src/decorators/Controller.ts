@@ -20,6 +20,7 @@
 
 import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerSerializerAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction, SETUP_SERIALIZER } from "../types";
 import { getAllClassProps } from "../utils";
+import { getActionList } from "./utils";
 
 /**
  * Marks a class as controller.
@@ -37,12 +38,7 @@ export function Controller(): ClassDecorator {
 
     classFunction.prototype[CONTROLLER_OBJECT_TYPE] = ControllerObjectType.Controller;
 
-    let actions: SetupFlitzAppControllerAction[] = classFunction.prototype[SETUP_FLITZ_APP];
-    if (!Array.isArray(actions)) {
-      classFunction.prototype[SETUP_FLITZ_APP] = actions = [];
-    }
-
-    actions.push(
+    getActionList<SetupFlitzAppControllerAction>(classFunction.prototype, SETUP_FLITZ_APP).push(
       async (context: SetupFlitzAppControllerActionContext) => {
         const allPropNames = getAllClassProps(classFunction);
 

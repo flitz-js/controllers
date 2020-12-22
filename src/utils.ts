@@ -18,8 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+import path from 'path';
 import util from 'util';
-import { RequestPath } from 'flitz';
+import { CanBeNil, RequestPath } from 'flitz';
+import { ROUTE_SEP } from './types';
 
 export function asAsync<T extends Function = ((...args: any[]) => Promise<any>)>(action: Function): T {
   if (util.types.isAsyncFunction(action)) {
@@ -78,8 +80,34 @@ export function getAllClassProps(startClass: any): string[] {
   return props;
 }
 
+export function isNil(val: CanBeNil<any>): val is (null | undefined) {
+  return val === null || typeof val === 'undefined';
+}
+
 export function isRequestPath(val: any): val is RequestPath {
   return typeof val === 'string' ||
     val instanceof RegExp ||
     typeof val === 'function';
+}
+
+export function normalizePath(val: any): string {
+  if (isNil(val)) {
+    val = '';
+  }
+
+  val = String(val)
+    .split(path.sep).join(ROUTE_SEP)
+    .split(ROUTE_SEP).map(x => x.trim()).filter(x => x !== '').join(ROUTE_SEP)
+    .trim();
+
+  // remove leading /
+  while (val.startsWith(ROUTE_SEP)) {
+    val = val.substr(1).trim();
+  }
+  // remove ending /
+  while (val.endsWith(ROUTE_SEP)) {
+    val = val.substr(0, val.length - 1).trim();
+  }
+
+  return ROUTE_SEP + val;
 }

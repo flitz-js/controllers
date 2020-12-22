@@ -18,40 +18,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil } from "flitz";
-import { isNil } from "../utils";
-import { SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerActionContext, SetupFlitzAppControllerSerializerAction } from "../types";
-import { getActionList, getMethodOrThrow } from "./utils";
+import { CanBeNil, Flitz } from "flitz";
+import { DocumentationFormat, DocumentationOptions } from "..";
+import { LoadedController } from "../types";
+import { initOpenApi3Documentation } from "./swagger";
 
-/**
- * Options for @Serializer() decorator.
- */
-export interface SerializerOptions {
+type InitDocumentationAction<TDoc extends DocumentationOptions = DocumentationOptions> = (options: InitDocumentationOptions<TDoc>) => Promise<void>;
+
+export interface InitDocumentationOptions<TDoc extends DocumentationOptions = DocumentationOptions> {
+  app: Flitz;
+  controllers: LoadedController[];
+  documentation: TDoc;
 }
 
-/**
- * Add a method of a controller as a response serializer.
- * 
- * @param {CanBeNil<SerializerOptions>} [options] Custom options.
- * 
- * @returns {MethodDecorator} The new decorator function.
- */
-export function Serializer(options?: CanBeNil<SerializerOptions>): MethodDecorator {
-  if (isNil(options)) {
-    options = {};
+export async function initDocumentation(options: InitDocumentationOptions) {
+  let initDocs: CanBeNil<InitDocumentationAction<any>>;
+
+  const format = options.documentation?.format || DocumentationFormat.OpenApi3;
+
+  switch (format) {
+    case DocumentationFormat.OpenApi3:
+      initDocs = initOpenApi3Documentation;
+      break;
   }
 
-  if (typeof options !== 'object') {
-    throw new TypeError('options must be object');
+  if (!initDocs) {
+    throw new TypeError('options.format not supported');
   }
 
-  return function (target, methodName, descriptor) {
-    const method = getMethodOrThrow(descriptor);
-
-    getActionList<SetupFlitzAppControllerSerializerAction>(method, SETUP_SERIALIZER).push(
-      async (context: SetupFlitzAppControllerSerializerActionContext) => {
-        context.controller[SERIALIZER] = method;
-      }
-    );
-  };
+  await initDocs(options);
 }

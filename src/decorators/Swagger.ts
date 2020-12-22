@@ -18,39 +18,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil } from "flitz";
-import { isNil } from "../utils";
-import { SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerActionContext, SetupFlitzAppControllerSerializerAction } from "../types";
-import { getActionList, getMethodOrThrow } from "./utils";
+import { OpenAPIV3 } from 'openapi-types';
+import { SetupFlitzAppControllerSwaggerDocAction, SetupFlitzAppControllerSwaggerDocActionContext, SETUP_SWAGGER } from '../docs/swagger';
+import { getActionList, getMethodOrThrow } from './utils';
 
 /**
- * Options for @Serializer() decorator.
- */
-export interface SerializerOptions {
-}
-
-/**
- * Add a method of a controller as a response serializer.
+ * Add a method of a controller to setup it up in a Swagger / Open API documentation.
  * 
- * @param {CanBeNil<SerializerOptions>} [options] Custom options.
+ * @param {OpenAPIV3.OperationObject} [description] The description for the underlying path.
  * 
  * @returns {MethodDecorator} The new decorator function.
  */
-export function Serializer(options?: CanBeNil<SerializerOptions>): MethodDecorator {
-  if (isNil(options)) {
-    options = {};
-  }
-
-  if (typeof options !== 'object') {
-    throw new TypeError('options must be object');
+export function Swagger(description: OpenAPIV3.OperationObject): MethodDecorator {
+  if (typeof description !== 'object') {
+    throw new TypeError('description must be object');
   }
 
   return function (target, methodName, descriptor) {
     const method = getMethodOrThrow(descriptor);
 
-    getActionList<SetupFlitzAppControllerSerializerAction>(method, SETUP_SERIALIZER).push(
-      async (context: SetupFlitzAppControllerSerializerActionContext) => {
-        context.controller[SERIALIZER] = method;
+    getActionList<SetupFlitzAppControllerSwaggerDocAction>(method, SETUP_SWAGGER).push(
+      async (context: SetupFlitzAppControllerSwaggerDocActionContext) => {
+        // TODO
       }
     );
   };

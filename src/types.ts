@@ -22,6 +22,12 @@ import { Flitz } from "flitz";
 
 export type HttpMethod = 'connect' | 'delete' | 'get' | 'head' | 'options' | 'patch' | 'post' | 'put' | 'trace';
 
+export interface LoadedController {
+  'class': any;
+  file: string;
+  instance: any;
+}
+
 export type SetupFlitzAppControllerAction = (context: SetupFlitzAppControllerActionContext) => Promise<any>;
 
 export type SetupFlitzAppControllerErrorHandlerAction = (context: SetupFlitzAppControllerErrorHandlerActionContext) => Promise<any>;
@@ -71,6 +77,7 @@ export enum ControllerObjectType {
 
 export const CONTROLLER_OBJECT_TYPE = Symbol('CONTROLLER_OBJECT_TYPE');
 export const ERROR_HANDLER = Symbol('ERROR_HANDLER');
+export const REGISTRATED_HTTP_METHODS = Symbol('REGISTRATED_HTTP_METHODS');
 export const ROUTE_SEP = '/';
 export const SERIALIZER = Symbol('SERIALIZER');
 export const SETUP_FLITZ_APP = Symbol('SETUP_FLITZ_APP');

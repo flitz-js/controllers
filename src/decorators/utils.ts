@@ -18,12 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import path from 'path';
 import { CanBeNil, defaultErrorHandler, Flitz, Middleware, Request, RequestErrorHandler, RequestHandler, RequestPath, Response } from 'flitz';
 import { ControllerRouteOptionsValue, ControllerRouteWithBodyOptions } from '.';
-import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, ROUTE_SEP, SERIALIZER, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
-import { asAsync, isRequestPath } from '../utils';
+import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, REGISTRATED_HTTP_METHODS, SERIALIZER, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
 import { ResponseSerializer } from '..';
+import { asAsync, isNil, isRequestPath, normalizePath } from '../utils';
 
 interface CreateHttpMethodDecoratorOptions {
   decoratorOptions: CanBeNil<ControllerRouteOptionsValue<ControllerRouteWithBodyOptions>>;
@@ -61,6 +60,15 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
     let actions: SetupFlitzAppControllerMethodAction[] = method[SETUP_FLITZ_APP];
     if (!Array.isArray(actions)) {
       method[SETUP_FLITZ_APP] = actions = [];
+    }
+
+    let registratedHttpMethods: HttpMethod[] = method[REGISTRATED_HTTP_METHODS];
+    if (!Array.isArray(registratedHttpMethods)) {
+      method[REGISTRATED_HTTP_METHODS] = registratedHttpMethods = [];
+    }
+
+    if (!registratedHttpMethods.includes(options.name)) {
+      registratedHttpMethods.push(options.name);
     }
 
     // options.decoratorOptions
@@ -165,30 +173,22 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
   };
 }
 
-export function isNil(val: CanBeNil<any>): val is (null | undefined) {
-  return val === null || typeof val === 'undefined';
+export function getActionList<T extends Function>(obj: any, key: PropertyKey): T[] {
+  let actions: T[] = obj[key];
+  if (!Array.isArray(actions)) {
+    obj[key] = actions = [];
+  }
+
+  return actions;
 }
 
-export function normalizePath(val: any): string {
-  if (isNil(val)) {
-    val = '';
+export function getMethodOrThrow<T extends Function = Function>(descriptor: PropertyDescriptor): T {
+  const method: any = descriptor?.value;
+  if (typeof method !== 'function') {
+    throw new TypeError('descriptor.value must be function');
   }
 
-  val = String(val)
-    .split(path.sep).join(ROUTE_SEP)
-    .split(ROUTE_SEP).map(x => x.trim()).filter(x => x !== '').join(ROUTE_SEP)
-    .trim();
-
-  // remove leading /
-  while (val.startsWith(ROUTE_SEP)) {
-    val = val.substr(1).trim();
-  }
-  // remove ending /
-  while (val.endsWith(ROUTE_SEP)) {
-    val = val.substr(0, val.length - 1).trim();
-  }
-
-  return ROUTE_SEP + val;
+  return method;
 }
 
 export function registerHttpMethod(
