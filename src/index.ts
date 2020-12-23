@@ -23,10 +23,16 @@ import fs from 'fs';
 import path from 'path';
 import { CanBeNil, Flitz, Request as FlitzRequest, Response as FlitzResponse } from 'flitz';
 import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerAction, SETUP_FLITZ_APP, LoadedController } from './types';
-import { normalizePath } from './utils';
+import { getValue, normalizePath } from './utils';
 import { compareValues, compareValuesBy } from './utils';
 import { DocumentationOptions } from './docs';
 import { initDocumentation } from './docs/init';
+import { isClass, isNil } from '../lib/utils';
+
+/**
+ * A value for a contract (key).
+ */
+export type Contract = string;
 
 /**
  * A possible value for 'initControllers()' function.
@@ -44,7 +50,7 @@ export interface InitControllersOptions {
   /**
    * Options for a generated API documentation.
    */
-  documentation?: CanBeNil<DocumentationOptions>;
+  documentation?: CanBeNil<ValueOrFunction<DocumentationOptions>>;
   /**
    * Glob patterns for module files, that include things like controller classes.
    * Default: *.js or *.ts
@@ -54,6 +60,10 @@ export interface InitControllersOptions {
    * The custom root directory. Default is '${cwd}/controllers'.
    */
   rootDir?: CanBeNil<string>;
+  /**
+   * List of value providers for @Value() and @Values() decorators.
+   */
+  values?: CanBeNil<ValueOrFunction<ValueProviderList>>;
 }
 
 /**
@@ -85,6 +95,27 @@ export interface Response extends FlitzResponse {
  * @param {Response} response The request context.
  */
 export type ResponseSerializer = (result: any, request: Request, response: Response) => Promise<any>;
+
+/**
+ * A value or a function, that provides it.
+ */
+export type ValueOrFunction<T extends any = any> = T | (() => T);
+
+/**
+ * List of value providers, grouped by contracts.
+ */
+export type ValueProviderList = {
+  [contract: string]: ValueProvider | ValueProvider[];
+};
+
+/**
+ * A provoder for a value.
+ * 
+ * @param {Contract} contract The contract.
+ * 
+ * @returns {T} The value.
+ */
+export type ValueProvider<T extends any = any> = (contract: Contract) => T;
 
 const DEFAULT_FILE_FILTERS = ['**/*.js', '**/*.ts'];
 
@@ -199,28 +230,31 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
 
     const controllerModule: any = require(moduleFile);
     for (const modulePropName in controllerModule) {
-      const maybeClass: any = controllerModule[modulePropName];
-      if (typeof maybeClass === 'function' && typeof maybeClass.constructor === 'function') {
-        if (maybeClass.prototype?.[CONTROLLER_OBJECT_TYPE] === ControllerObjectType.Controller) {
-          const controller: any = new maybeClass();
+      const controllerClass: any = controllerModule[modulePropName];
+      if (isClass(controllerClass)) {
+        if (controllerClass.prototype?.[CONTROLLER_OBJECT_TYPE] === ControllerObjectType.Controller) {
+          const controller: any = new controllerClass();
           const setupControllerActions: SetupFlitzAppControllerAction[] = controller[SETUP_FLITZ_APP];
 
           const basePath = normalizePath(
             path.relative(rootDir, moduleDir)
           );
 
+          const values = getValue(options.values);
+
           for (const setupAction of setupControllerActions) {
             await setupAction({
               app: options.app,
               basePath,
               controller,
-              controllerClass: maybeClass,
-              file
+              controllerClass,
+              file,
+              values
             });
           }
 
           loadedControllers.push({
-            class: maybeClass,
+            class: controllerClass,
             file: file,
             instance: controller
           });
@@ -229,11 +263,13 @@ export async function initControllers(optionsOrApp: FlitzAppOrInitOptions) {
     }
   }
 
-  if (options.documentation) {
+  const documentation = getValue(options.documentation);
+
+  if (!isNil(documentation)) {
     await initDocumentation({
       app: options.app,
       controllers: loadedControllers,
-      documentation: options.documentation
+      documentation
     });
   }
 }

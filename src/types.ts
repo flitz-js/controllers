@@ -18,7 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { Flitz, RequestPath } from "flitz";
+import { CanBeNil, Flitz, RequestPath } from "flitz";
+import { ValueProviderList } from ".";
+
+export type Constructor<T extends any = any> = (new (...args: any[]) => T);
 
 export interface ControllerMethodInfo {
   method: HttpMethod;
@@ -42,12 +45,15 @@ export type SetupFlitzAppControllerMethodAction = (context: SetupFlitzAppControl
 
 export type SetupFlitzAppControllerSerializerAction = (context: SetupFlitzAppControllerSerializerActionContext) => Promise<any>;
 
+export type SetupFlitzAppControllerValueImportAction = (context: SetupFlitzAppControllerValueImportActionContext) => Promise<any>;
+
 export interface SetupFlitzAppControllerActionContext {
   app: Flitz;
   basePath: string;
   controller: any;
   controllerClass: any;
   file: string;
+  values: CanBeNil<ValueProviderList>;
 }
 
 export interface SetupFlitzAppControllerErrorHandlerActionContext {
@@ -76,11 +82,20 @@ export interface SetupFlitzAppControllerSerializerActionContext {
   name: string;
 }
 
+export interface SetupFlitzAppControllerValueImportActionContext {
+  app: Flitz;
+  controller: any;
+  controllerClass: any;
+  file: string;
+  values: CanBeNil<ValueProviderList>;
+}
+
 export enum ControllerObjectType {
   Controller = 'controller',
   ErrorHandler = 'error_handler',
   Method = 'method',
-  Serializer = 'serializer'
+  Serializer = 'serializer',
+  Value = 'value'
 }
 
 export const CONTROLLER_METHOD_INFO = Symbol('CONTROLLER_METHOD_INFO');
@@ -90,6 +105,9 @@ export const PARAM_PREFIX = '@';
 export const REGISTRATED_HTTP_METHODS = Symbol('REGISTRATED_HTTP_METHODS');
 export const ROUTE_SEP = '/';
 export const SERIALIZER = Symbol('SERIALIZER');
+export const SETUP_VALUE = Symbol('SETUP_VALUE');
 export const SETUP_FLITZ_APP = Symbol('SETUP_FLITZ_APP');
 export const SETUP_ERROR_HANDLER = Symbol('SETUP_ERROR_HANDLER');
 export const SETUP_SERIALIZER = Symbol('SETUP_SERIALIZER');
+export const SETUP_VALUE_IMPORT = Symbol('SETUP_VALUE_IMPORT');
+export const VALUE_IMPORT = Symbol('VALUE_IMPORT');

@@ -209,6 +209,14 @@ export function getMethodOrThrow<T extends Function = Function>(descriptor: Prop
   return method;
 }
 
+export function importControllerValue(controller: any, propertyName: string, descriptor: CanBeNil<PropertyDescriptor>, value: any) {
+  if (typeof descriptor?.value === 'function') {
+    descriptor.value(value);
+  } else {
+    controller[propertyName] = value;
+  }
+}
+
 export function isControllerMethodOrThrow(method: any) {
   if (method[CONTROLLER_OBJECT_TYPE] !== ControllerObjectType.Method) {
     throw new Error('No controller method');

@@ -21,8 +21,8 @@
 import path from 'path';
 import util from 'util';
 import { CanBeNil, RequestPath } from 'flitz';
-import { ParamList } from '.';
-import { ROUTE_SEP } from './types';
+import { Contract, ParamList, ValueOrFunction, ValueProviderList } from '.';
+import { Constructor, ROUTE_SEP } from './types';
 
 export interface RegexParamResult {
   keys: string[];
@@ -99,6 +99,36 @@ export function getParamList(path: string, result: RegexParamResult): CanBeNil<P
   }
 
   return paramList;
+}
+
+export function getValue<T extends any = any>(valueOrFunc: ValueOrFunction<T>): T {
+  if (typeof valueOrFunc === 'function') {
+    return (valueOrFunc as any)();
+  }
+
+  return valueOrFunc;
+}
+
+export function getValuesFromList(values: CanBeNil<ValueProviderList>, contract: Contract): CanBeNil<any[]> {
+  let valueProviders = values?.[contract];
+  if (isNil(valueProviders)) {
+    return null;
+  }
+
+  if (!Array.isArray(valueProviders)) {
+    valueProviders = [valueProviders];
+  }
+
+  valueProviders = valueProviders.filter(vp => !isNil(vp));
+  if (!valueProviders.every(vp => typeof vp === 'function')) {
+    throw new TypeError(`All items of values[${contract}] must be function`);
+  }
+
+  return valueProviders.map(vp => vp(contract));
+}
+
+export function isClass(obj: any): obj is Constructor {
+  return typeof obj?.constructor === 'function';
 }
 
 export function isNil(val: CanBeNil<any>): val is (null | undefined) {

@@ -18,8 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerSerializerAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction, SETUP_SERIALIZER } from "../types";
-import { getAllClassProps } from "../utils";
+import { CanBeNil } from "flitz";
+import { ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerSerializerAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction, SETUP_SERIALIZER, SETUP_VALUE_IMPORT, SetupFlitzAppControllerValueImportAction } from "../types";
+import { getAllClassProps, isClass } from "../utils";
 import { getActionList, setControllerObjectTypeOrThrow } from "./utils";
 
 /**
@@ -29,10 +30,7 @@ import { getActionList, setControllerObjectTypeOrThrow } from "./utils";
  */
 export function Controller(): ClassDecorator {
   return function (classFunction: Function) {
-    if (typeof classFunction !== 'function') {
-      throw new TypeError('classFunction must be function');
-    }
-    if (typeof classFunction.constructor !== 'function') {
+    if (!isClass(classFunction)) {
       throw new TypeError('classFunction must be class');
     }
 
@@ -105,6 +103,22 @@ export function Controller(): ClassDecorator {
               method: entry.value,
               name: entry.property
             });
+          }
+        }
+
+        // value imports
+        {
+          const setupValueImportActions: CanBeNil<SetupFlitzAppControllerValueImportAction[]> = context.controller[SETUP_VALUE_IMPORT];
+          if (setupValueImportActions) {
+            for (const setupAction of setupValueImportActions) {
+              await setupAction({
+                app: context.app,
+                controller: context.controller,
+                controllerClass: context.controllerClass,
+                file: context.file,
+                values: context.values
+              });
+            }
           }
         }
       }
