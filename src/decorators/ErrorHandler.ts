@@ -20,8 +20,8 @@
 
 import { CanBeNil } from "flitz";
 import { isNil } from "../utils";
-import { ERROR_HANDLER, SETUP_ERROR_HANDLER, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerErrorHandlerActionContext } from "../types";
-import { getActionList, getMethodOrThrow } from "./utils";
+import { ERROR_HANDLER, SETUP_ERROR_HANDLER, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerErrorHandlerActionContext, ControllerObjectType } from "../types";
+import { getActionList, getMethodOrThrow, setControllerObjectTypeOrThrow } from "./utils";
 
 /**
  * Options for @ErrorHandler() decorator.
@@ -54,6 +54,8 @@ export function ErrorHandler(options?: CanBeNil<ErrorHandlerOptions>): MethodDec
 
   return function (target, methodName, descriptor) {
     const method = getMethodOrThrow(descriptor);
+
+    setControllerObjectTypeOrThrow(method, ControllerObjectType.ErrorHandler);
 
     getActionList<SetupFlitzAppControllerErrorHandlerAction>(method, SETUP_ERROR_HANDLER).push(
       async (context: SetupFlitzAppControllerErrorHandlerActionContext) => {

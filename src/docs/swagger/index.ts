@@ -19,15 +19,18 @@
 // SOFTWARE.
 
 import fs from 'fs';
+import indexHtml from './resources/index_html';
 import mimeTypes from 'mime-types';
 import path from 'path';
+import toml from '@iarna/toml';
+import yaml from 'js-yaml';
 import { OpenAPIV3 } from "openapi-types";
-import { DocumentationFormat, DocumentationOptions } from ".";
-import { InitDocumentationOptions } from "./init";
-import { getDocsBasePath } from "./utils";
+import { DocumentationFormat, DocumentationOptions } from "..";
+import { InitDocumentationOptions } from "../init";
+import { getDocsBasePath } from "../utils";
 import { CanBeNil, RequestPathValidator } from "flitz";
-import { ROUTE_SEP } from "../types";
-import { getAllClassProps, normalizePath } from "../utils";
+import { ROUTE_SEP } from "../../types";
+import { getAllClassProps, normalizePath } from "../../utils";
 
 export interface InitOpenApi3DocumentationOptions extends InitDocumentationOptions {
 }
@@ -38,8 +41,17 @@ export interface InitOpenApi3DocumentationOptions extends InitDocumentationOptio
 export interface OpenApi3Options extends DocumentationOptions {
   /**
    * The document.
+   * 
+   * @see https://swagger.io/docs/specification/basic-structure/
    */
-  document: OpenAPIV3.Document;
+  document: {
+    components?: OpenAPIV3.ComponentsObject;
+    externalDocs?: OpenAPIV3.ExternalDocumentationObject;
+    info?: OpenAPIV3.InfoObject;
+    security?: OpenAPIV3.SecurityRequirementObject[];
+    servers?: OpenAPIV3.ServerObject[];
+    tags?: OpenAPIV3.TagObject[];
+  };
   /**
    * @inheritdoc
    */
@@ -61,15 +73,16 @@ export const SETUP_SWAGGER = Symbol('SETUP_SWAGGER');
 const pathToSwaggerUi: string = path.resolve(
   require('swagger-ui-dist').absolutePath()
 );
+const indexHtmlFilePath = path.join(pathToSwaggerUi, 'index.html');
 const { readFile, stat } = fs.promises;
 
 function createPathValidator(basePath: CanBeNil<string>): RequestPathValidator {
-  const prefix1 = getDocsBasePath(basePath);
-  const prefix2 = prefix1 + (prefix1.endsWith(ROUTE_SEP) ? '' : ROUTE_SEP);
+  basePath = getDocsBasePath(basePath);
+  const basePathWithSuffix = basePath + (basePath.endsWith(ROUTE_SEP) ? '' : ROUTE_SEP);
 
   return (request) => {
-    return request.url === prefix1 ||
-      !!request.url?.startsWith(prefix2);
+    return request.url === basePath ||
+      !!request.url?.startsWith(basePathWithSuffix);
   };
 }
 
@@ -79,9 +92,15 @@ export async function initOpenApi3Documentation(
   const { app, documentation } = options;
 
   const basePath = getDocsBasePath(documentation.basePath);
+  const basePathWithSuffix = basePath + (basePath.endsWith(ROUTE_SEP) ? '' : ROUTE_SEP);
+
   const document: OpenAPIV3.Document = JSON.parse(
     JSON.stringify(options.documentation.document)
   );
+  document.openapi = '3.0.0';
+  document.paths = {};
+
+  const indexHtmlContent = Buffer.from(await indexHtml(), 'utf8');
 
   // run Swagger actions
   for (const controller of options.controllers) {
@@ -112,11 +131,56 @@ export async function initOpenApi3Documentation(
     }
   }
 
+  const documentJson = Buffer.from(JSON.stringify(document), 'utf8');
+  const documentToml = Buffer.from(toml.stringify(document as any), 'utf8');
+  const documentYaml = Buffer.from(yaml.safeDump(document), 'utf8');
+
   // Swagger UI
   app.get(createPathValidator(documentation.basePath), async (request, response) => {
     try {
+      if (request.url === basePath) {
+        response.writeHead(301, {
+          Location: basePathWithSuffix
+        });
+
+        return;
+      }
+
       let fileOrDir = normalizePath(request.url);
       let relativePath = normalizePath(path.relative(basePath, fileOrDir));
+
+      // return as JSON
+      if (['/json', '/json/'].includes(relativePath)) {
+        response.writeHead(200, {
+          'Content-Disposition': `attachment; filename="api-openapi3.json`,
+          'Content-Type': 'application/json; charset=utf-8'
+        });
+        response.write(documentJson);
+
+        return;
+      }
+
+      // return as YAML
+      if (['/yaml', '/yaml/'].includes(relativePath)) {
+        response.writeHead(200, {
+          'Content-Disposition': `attachment; filename="api-openapi3.yaml`,
+          'Content-Type': 'application/x-yaml; charset=utf-8'
+        });
+        response.write(documentYaml);
+
+        return;
+      }
+
+      // return as TOML
+      if (['/toml', '/toml/'].includes(relativePath)) {
+        response.writeHead(200, {
+          'Content-Disposition': `attachment; filename="api-openapi3.toml`,
+          'Content-Type': 'application/toml; charset=utf-8'
+        });
+        response.write(documentToml);
+
+        return;
+      }
 
       let fullPath = path.join(pathToSwaggerUi, relativePath);
       if (
@@ -128,7 +192,8 @@ export async function initOpenApi3Documentation(
         if (fs.existsSync(fullPath)) {
           const fileOrDirStats = await stat(fullPath);
           if (fileOrDirStats.isDirectory()) {
-            fullPath = path.join(fullPath, 'index.html');
+            fullPath = indexHtmlFilePath;
+
             if (fs.existsSync(fullPath)) {
               existingFile = fullPath;
             }
@@ -137,7 +202,16 @@ export async function initOpenApi3Documentation(
           }
         }
 
-        if (existingFile) {
+        if (fullPath === indexHtmlFilePath) {  // index.html
+          response.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8'
+          });
+          response.write(indexHtmlContent);
+
+          return;
+        }
+
+        if (existingFile) {  // does file exist?
           existingFile = path.resolve(existingFile);
           const contentType = mimeTypes.contentType(path.basename(existingFile)) || 'application/octet-stream';
 

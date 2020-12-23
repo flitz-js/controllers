@@ -18,9 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CONTROLLER_OBJECT_TYPE, ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerSerializerAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction, SETUP_SERIALIZER } from "../types";
+import { ControllerObjectType, SetupFlitzAppControllerErrorHandlerAction, SetupFlitzAppControllerActionContext, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerSerializerAction, SETUP_ERROR_HANDLER, SETUP_FLITZ_APP, SetupFlitzAppControllerAction, SETUP_SERIALIZER } from "../types";
 import { getAllClassProps } from "../utils";
-import { getActionList } from "./utils";
+import { getActionList, setControllerObjectTypeOrThrow } from "./utils";
 
 /**
  * Marks a class as controller.
@@ -36,7 +36,7 @@ export function Controller(): ClassDecorator {
       throw new TypeError('classFunction must be class');
     }
 
-    classFunction.prototype[CONTROLLER_OBJECT_TYPE] = ControllerObjectType.Controller;
+    setControllerObjectTypeOrThrow(classFunction.prototype, ControllerObjectType.Controller);
 
     getActionList<SetupFlitzAppControllerAction>(classFunction.prototype, SETUP_FLITZ_APP).push(
       async (context: SetupFlitzAppControllerActionContext) => {
@@ -51,8 +51,25 @@ export function Controller(): ClassDecorator {
 
         const controllerMethods = allMethods.filter(entry => {
           return Array.isArray(entry.value[SETUP_FLITZ_APP]) &&
-            !entry.value[SETUP_ERROR_HANDLER]?.length;
+            !entry.value[SETUP_ERROR_HANDLER]?.length &&
+            !entry.value[SETUP_SERIALIZER]?.length;
         });
+
+        // controllers
+        for (const entry of controllerMethods) {
+          const setupMethodActions: SetupFlitzAppControllerMethodAction[] = entry.value[SETUP_FLITZ_APP];
+
+          for (const setupAction of setupMethodActions) {
+            await setupAction({
+              app: context.app,
+              basePath: context.basePath,
+              controller: context.controller,
+              file: context.file,
+              method: entry.value,
+              name: entry.property
+            });
+          }
+        }
 
         // controller wide error handler?
         const withSetupErrorHandlers = allMethods.filter(entry => {
@@ -80,21 +97,6 @@ export function Controller(): ClassDecorator {
           const setupSerilizerActions: SetupFlitzAppControllerSerializerAction[] = entry.value[SETUP_SERIALIZER];
 
           for (const setupAction of setupSerilizerActions) {
-            await setupAction({
-              app: context.app,
-              basePath: context.basePath,
-              controller: context.controller,
-              file: context.file,
-              method: entry.value,
-              name: entry.property
-            });
-          }
-        }
-
-        for (const entry of controllerMethods) {
-          const setupMethodActions: SetupFlitzAppControllerMethodAction[] = entry.value[SETUP_FLITZ_APP];
-
-          for (const setupAction of setupMethodActions) {
             await setupAction({
               app: context.app,
               basePath: context.basePath,

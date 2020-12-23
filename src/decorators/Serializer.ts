@@ -20,8 +20,8 @@
 
 import { CanBeNil } from "flitz";
 import { isNil } from "../utils";
-import { SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerActionContext, SetupFlitzAppControllerSerializerAction } from "../types";
-import { getActionList, getMethodOrThrow } from "./utils";
+import { SETUP_SERIALIZER, SERIALIZER, SetupFlitzAppControllerSerializerActionContext, SetupFlitzAppControllerSerializerAction, ControllerObjectType } from "../types";
+import { getActionList, getMethodOrThrow, setControllerObjectTypeOrThrow } from "./utils";
 
 /**
  * Options for @Serializer() decorator.
@@ -47,6 +47,8 @@ export function Serializer(options?: CanBeNil<SerializerOptions>): MethodDecorat
 
   return function (target, methodName, descriptor) {
     const method = getMethodOrThrow(descriptor);
+
+    setControllerObjectTypeOrThrow(method, ControllerObjectType.Serializer);
 
     getActionList<SetupFlitzAppControllerSerializerAction>(method, SETUP_SERIALIZER).push(
       async (context: SetupFlitzAppControllerSerializerActionContext) => {

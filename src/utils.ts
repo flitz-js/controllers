@@ -21,7 +21,13 @@
 import path from 'path';
 import util from 'util';
 import { CanBeNil, RequestPath } from 'flitz';
+import { ParamList } from '.';
 import { ROUTE_SEP } from './types';
+
+export interface RegexParamResult {
+  keys: string[];
+  pattern: RegExp;
+}
 
 export function asAsync<T extends Function = ((...args: any[]) => Promise<any>)>(action: Function): T {
   if (util.types.isAsyncFunction(action)) {
@@ -80,6 +86,21 @@ export function getAllClassProps(startClass: any): string[] {
   return props;
 }
 
+export function getParamList(path: string, result: RegexParamResult): CanBeNil<ParamList> {
+  const paramList: any = {};
+
+  const matches = result.pattern.exec(path);
+  if (!matches) {
+    return null;
+  }
+
+  for (let i = 0; i < result.keys.length; i++) {
+    paramList[result.keys[i]] = matches[i + 1];
+  }
+
+  return paramList;
+}
+
 export function isNil(val: CanBeNil<any>): val is (null | undefined) {
   return val === null || typeof val === 'undefined';
 }
@@ -110,4 +131,22 @@ export function normalizePath(val: any): string {
   }
 
   return ROUTE_SEP + val;
+}
+
+export function sortObjectByKeys<T extends any = any>(obj: T): T {
+  if (isNil(obj)) {
+    return obj;
+  }
+
+  const storedKeys = Object.keys(obj as any)
+    .sort((x, y) => {
+      return compareValuesBy(x, y, k => k.toLowerCase().trim());
+    });
+
+  const newObj: any = {};
+  storedKeys.forEach(key => {
+    newObj[key] = (obj as any)[key];
+  });
+
+  return newObj;
 }

@@ -18,11 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil, defaultErrorHandler, Flitz, Middleware, Request, RequestErrorHandler, RequestHandler, RequestPath, Response } from 'flitz';
+const regexparam = require('regexparam');
+import { CanBeNil, defaultErrorHandler, Flitz, Middleware, RequestErrorHandler, RequestHandler, RequestPath } from 'flitz';
 import { ControllerRouteOptionsValue, ControllerRouteWithBodyOptions } from '.';
-import { ControllerObjectType, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, REGISTRATED_HTTP_METHODS, SERIALIZER, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
-import { ResponseSerializer } from '..';
-import { asAsync, isNil, isRequestPath, normalizePath } from '../utils';
+import { Request, Response, ResponseSerializer } from '..';
+import { ControllerMethodInfo, ControllerObjectType, CONTROLLER_METHOD_INFO, CONTROLLER_OBJECT_TYPE, ERROR_HANDLER, HttpMethod, PARAM_PREFIX, REGISTRATED_HTTP_METHODS, SERIALIZER, SetupFlitzAppControllerMethodAction, SetupFlitzAppControllerMethodActionContext, SETUP_FLITZ_APP } from '../types';
+import { asAsync, getParamList, isNil, isRequestPath, normalizePath, RegexParamResult } from '../utils';
 
 interface CreateHttpMethodDecoratorOptions {
   decoratorOptions: CanBeNil<ControllerRouteOptionsValue<ControllerRouteWithBodyOptions>>;
@@ -50,26 +51,7 @@ interface WrapActionOptions {
 
 export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOptions): MethodDecorator {
   return function (target, methodName, descriptor) {
-    const method: any = descriptor?.value;
-    if (typeof method !== 'function') {
-      throw new TypeError('descriptor.value must be function');
-    }
-
-    method[CONTROLLER_OBJECT_TYPE] = ControllerObjectType.Method;
-
-    let actions: SetupFlitzAppControllerMethodAction[] = method[SETUP_FLITZ_APP];
-    if (!Array.isArray(actions)) {
-      method[SETUP_FLITZ_APP] = actions = [];
-    }
-
-    let registratedHttpMethods: HttpMethod[] = method[REGISTRATED_HTTP_METHODS];
-    if (!Array.isArray(registratedHttpMethods)) {
-      method[REGISTRATED_HTTP_METHODS] = registratedHttpMethods = [];
-    }
-
-    if (!registratedHttpMethods.includes(options.name)) {
-      registratedHttpMethods.push(options.name);
-    }
+    const method = getMethodOrThrow(descriptor);
 
     // options.decoratorOptions
     let routeOptions: CanBeNil<ControllerRouteWithBodyOptions>;
@@ -114,29 +96,43 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
       }
     }
 
-    actions.push(
+    getActionList<SetupFlitzAppControllerMethodAction>(method, SETUP_FLITZ_APP).push(
       async (context: SetupFlitzAppControllerMethodActionContext) => {
-        const handler = asAsync<RequestHandler>(method.bind(context.controller));
+        setControllerObjectTypeOrThrow(method, ControllerObjectType.Method);
+
+        const registratedHttpMethods = getValueList<HttpMethod>(method, REGISTRATED_HTTP_METHODS);
+        if (!registratedHttpMethods.includes(options.name)) {
+          registratedHttpMethods.push(options.name);
+        }
+
         const routeName = String(methodName).trim();
 
         // relative path
-        let relativePath = '';
+        let relativePath: CanBeNil<string>;
         if (routeName && routeName !== 'index') {
-          relativePath += routeName;
+          relativePath = routeName;
         }
         relativePath = normalizePath(relativePath);
+
+        const fullPath = normalizePath(context.basePath + normalizePath(relativePath));
+        let routePath = fullPath;
 
         // define route
         let route: RequestPath;
         if (isNil(reqPath)) {
-          route = normalizePath(context.basePath + normalizePath(relativePath));  // default, relative path
+          route = toRoute(fullPath);  // no custom path
         } else {
           if (typeof reqPath === 'function') {
             route = reqPath;  // custom validator
           } else if (reqPath instanceof RegExp) {
-            route = () => reqPath.test(relativePath);  // custom regular expression
+            route = () => reqPath.test(relativePath as string);  // custom regular expression
           } else {
-            route = normalizePath(context.basePath + normalizePath(reqPath));  // custom, relative path
+            // custom, relative path
+
+            const newFullPath = normalizePath(context.basePath + normalizePath(reqPath).split(':').join(PARAM_PREFIX));
+
+            route = toRoute(newFullPath);  // no custom path
+            routePath = newFullPath;
           }
         }
 
@@ -150,19 +146,37 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
           }
         }
 
+        const methodInfo: ControllerMethodInfo = {
+          method: options.name,
+          route,
+          routePath
+        };
+        (method as any)[CONTROLLER_METHOD_INFO] = methodInfo;
+
         registerHttpMethod({
           app: context.app,
           autoEnd,
           controller: context.controller,
           getErrorHandler: () => {
-            return (customOnError || context.controller[ERROR_HANDLER] || defaultErrorHandler).bind(context.controller);
+            return asAsync<RequestErrorHandler>(
+              (customOnError || context.controller[ERROR_HANDLER] || defaultErrorHandler)
+                .bind(context.controller)
+            );
           },
-          getRequestHandler: () => handler,
+          getRequestHandler: () => {
+            return asAsync<RequestHandler>(
+              method.bind(context.controller)
+            );
+          },
           getResponseSerializer: () => {
-            const serializer = customSerializer || context.controller[SERIALIZER];
+            let serializer: CanBeNil<ResponseSerializer> = customSerializer || context.controller[SERIALIZER];
             if (serializer) {
-              return serializer.bind(context.controller);
+              serializer = asAsync<ResponseSerializer>(
+                serializer.bind(context.controller)
+              );
             }
+
+            return serializer;
           },
           middlewares,
           name: options.name,
@@ -174,12 +188,16 @@ export function createHttpMethodDecorator(options: CreateHttpMethodDecoratorOpti
 }
 
 export function getActionList<T extends Function>(obj: any, key: PropertyKey): T[] {
-  let actions: T[] = obj[key];
-  if (!Array.isArray(actions)) {
-    obj[key] = actions = [];
+  return getValueList<T>(obj, key);
+}
+
+export function getValueList<T>(obj: any, key: PropertyKey): T[] {
+  let values: T[] = obj[key];
+  if (!Array.isArray(values)) {
+    obj[key] = values = [];
   }
 
-  return actions;
+  return values;
 }
 
 export function getMethodOrThrow<T extends Function = Function>(descriptor: PropertyDescriptor): T {
@@ -189,6 +207,12 @@ export function getMethodOrThrow<T extends Function = Function>(descriptor: Prop
   }
 
   return method;
+}
+
+export function isControllerMethodOrThrow(method: any) {
+  if (method[CONTROLLER_OBJECT_TYPE] !== ControllerObjectType.Method) {
+    throw new Error('No controller method');
+  }
 }
 
 export function registerHttpMethod(
@@ -208,11 +232,40 @@ export function registerHttpMethod(
   );
 }
 
+export function setControllerObjectTypeOrThrow(obj: any, type: ControllerObjectType) {
+  if (!isNil(obj?.[CONTROLLER_OBJECT_TYPE])) {
+    throw new Error('Cannot reset controller object as ' + type);
+  }
+
+  obj[CONTROLLER_OBJECT_TYPE] = type;
+}
+
+function toRoute(fullPath: string): RequestPath {
+  if (fullPath.includes(PARAM_PREFIX)) {
+    const result: RegexParamResult = regexparam(
+      fullPath.split(PARAM_PREFIX).join(':')
+    );
+
+    return (request: Request) => {
+      const params = getParamList(request.url!, result);
+      if (params) {
+        request.params = params;
+        return true;
+      }
+
+      return false;
+    };
+  }
+
+  return fullPath;
+}
+
 function wrapAction({ autoEnd, getErrorHandler, getRequestHandler, getResponseSerializer }: WrapActionOptions): RequestHandler {
   const withSerializer = async (req: Request, resp: Response) => {
     let result = await getRequestHandler()(req, resp);
 
     const serializer = getResponseSerializer();
+
     if (serializer) {
       result = await serializer(result, req, resp);
     }

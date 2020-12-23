@@ -18,7 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { Flitz } from "flitz";
+import { Flitz, RequestPath } from "flitz";
+
+export interface ControllerMethodInfo {
+  method: HttpMethod;
+  route: RequestPath;
+  routePath: string;
+}
 
 export type HttpMethod = 'connect' | 'delete' | 'get' | 'head' | 'options' | 'patch' | 'post' | 'put' | 'trace';
 
@@ -72,11 +78,15 @@ export interface SetupFlitzAppControllerSerializerActionContext {
 
 export enum ControllerObjectType {
   Controller = 'controller',
+  ErrorHandler = 'error_handler',
   Method = 'method',
+  Serializer = 'serializer'
 }
 
+export const CONTROLLER_METHOD_INFO = Symbol('CONTROLLER_METHOD_INFO');
 export const CONTROLLER_OBJECT_TYPE = Symbol('CONTROLLER_OBJECT_TYPE');
 export const ERROR_HANDLER = Symbol('ERROR_HANDLER');
+export const PARAM_PREFIX = '@';
 export const REGISTRATED_HTTP_METHODS = Symbol('REGISTRATED_HTTP_METHODS');
 export const ROUTE_SEP = '/';
 export const SERIALIZER = Symbol('SERIALIZER');

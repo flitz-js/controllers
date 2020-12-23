@@ -35,7 +35,7 @@ export enum DocumentationFormat {
  */
 export interface DocumentationOptions {
   /**
-   * The base path. Default: '/docs'
+   * The base path. Default: '/_docs'
    */
   basePath?: CanBeNil<string>;
   /**

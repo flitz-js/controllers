@@ -20,7 +20,10 @@
 
 import { OpenAPIV3 } from 'openapi-types';
 import { SetupFlitzAppControllerSwaggerDocAction, SetupFlitzAppControllerSwaggerDocActionContext, SETUP_SWAGGER } from '../docs/swagger';
-import { getActionList, getMethodOrThrow } from './utils';
+import { toSwaggerPath } from '../docs/utils';
+import { ControllerMethodInfo, CONTROLLER_METHOD_INFO } from '../types';
+import { isNil, sortObjectByKeys } from '../utils';
+import { getActionList, getMethodOrThrow, isControllerMethodOrThrow } from './utils';
 
 /**
  * Add a method of a controller to setup it up in a Swagger / Open API documentation.
@@ -39,7 +42,31 @@ export function Swagger(description: OpenAPIV3.OperationObject): MethodDecorator
 
     getActionList<SetupFlitzAppControllerSwaggerDocAction>(method, SETUP_SWAGGER).push(
       async (context: SetupFlitzAppControllerSwaggerDocActionContext) => {
-        // TODO
+        isControllerMethodOrThrow(method);
+
+        const info: ControllerMethodInfo = (method as any)[CONTROLLER_METHOD_INFO];
+        if (['connect'].includes(info.method)) {
+          throw new Error('Swagger does not support ' + info.method);
+        }
+
+        const swaggerPath = toSwaggerPath(info.routePath);
+
+        let { paths } = context.document;
+
+        if (!paths[swaggerPath]) {
+          paths[swaggerPath] = {};
+
+          paths = sortObjectByKeys(paths);  // sort by paths
+        }
+
+        if (!isNil((paths as any)[swaggerPath][info.method])) {
+          throw new Error(`Swagger description already defined for [${info.method.toUpperCase()}] ${info.routePath}`);
+        }
+
+        (paths as any)[swaggerPath][info.method] = description;
+        (paths as any)[swaggerPath] = sortObjectByKeys((paths as any)[swaggerPath]);  // sort by HTTP method
+
+        context.document.paths = paths;
       }
     );
   };

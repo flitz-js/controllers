@@ -57,9 +57,18 @@ export interface InitControllersOptions {
 }
 
 /**
+ * List of parameters.
+ */
+export type ParamList<TValue extends any = string> = { [name: string]: TValue };
+
+/**
  * An extended request context.
  */
 export interface Request extends FlitzRequest {
+  /**
+   * List of parameters.
+   */
+  params?: ParamList;
 }
 
 /**

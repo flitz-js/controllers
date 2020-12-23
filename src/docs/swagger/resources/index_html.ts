@@ -18,32 +18,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import { CanBeNil } from "flitz";
-import { PARAM_PREFIX, ROUTE_SEP } from "../types";
-import { isNil, normalizePath } from "../utils";
+import ejs from 'ejs';
+import fs from 'fs';
+import path from 'path';
 
-export function getDocsBasePath(basePath: CanBeNil<string>): string {
-  if (isNil(basePath)) {
-    basePath = '';
+const pathToSwaggerUi: string = path.resolve(
+  require('swagger-ui-dist').absolutePath()
+);
+const indexHtmlFilePath = path.join(pathToSwaggerUi, 'index.html');
+
+export default async (): Promise<string> => {
+  const template = await fs.promises.readFile(indexHtmlFilePath, 'utf8');
+
+  const oldLines = template.split('\n');
+
+  const newLines: string[] = [];
+  let linesToSkip = 0;
+  for (const l of oldLines) {
+    if (linesToSkip > 0) {
+      --linesToSkip;
+      continue;
+    }
+
+    if (l.trim().startsWith('window.ui = ui')) {
+      // code to remove URL text field
+
+      newLines.push(l);
+      newLines.push("document.querySelector('#swagger-ui .topbar-wrapper .download-url-wrapper').remove()");
+    } else if (l.trim().startsWith('const ui = SwaggerUIBundle({')) {
+      // change URL
+
+      newLines.push(l);
+      newLines.push("url: './json',");
+
+      linesToSkip = 1;
+    } else {
+      newLines.push(l);
+    }
   }
 
-  if (typeof basePath !== 'string') {
-    throw new TypeError('basePath must be string');
-  }
-
-  basePath = basePath.trim();
-  if (basePath === '') {
-    return '/_docs';
-  }
-
-  return normalizePath(basePath);
-}
-
-export function toSwaggerPath(routePath: string): string {
-  return normalizePath(
-    normalizePath(routePath)
-      .split(ROUTE_SEP)
-      .map(x => x.trimStart().startsWith(PARAM_PREFIX) ? `{${x.substr(1)}}` : x)
-      .join(ROUTE_SEP)
-  );
-}
+  return ejs.render(newLines.join('\n'), {
+  });
+};
